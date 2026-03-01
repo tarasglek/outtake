@@ -12,3 +12,7 @@ Syncing can also be limited to a specific label.
 go get github.com/danmarg/outtake
 ./outtake --directory ~/Mail
 ```
+for dev:
+````
+go run . --directory /home/taras/Mail/mailbox/
+````
