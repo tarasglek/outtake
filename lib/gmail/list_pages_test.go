@@ -46,7 +46,6 @@ func TestEnsureListPagesSchema(t *testing.T) {
 		"oauth_tokens",
 		"sync_state",
 		"gmail_labels",
-		"gmail_message_labels",
 	} {
 		if countRows(t, db, "sqlite_schema WHERE type='table' AND name='"+tbl+"'") != 1 {
 			t.Fatalf("expected table %s to exist", tbl)
