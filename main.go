@@ -49,6 +49,10 @@ func main() {
 			Usage: "Max parallel downloads",
 			Value: 8,
 		},
+		&cli.Uint64Flag{
+			Name:  "start-history-id",
+			Usage: "Override baseline startHistoryId for history fetch/replay convergence",
+		},
 	}
 	app.Action = func(ctx *cli.Context) error {
 		d := ctx.String("directory")
@@ -70,6 +74,7 @@ func main() {
 		}
 		gmail.MessageBufferSize = ctx.Int("buffer")
 		gmail.ConcurrentDownloads = ctx.Int("parallel")
+		g.SetStartHistoryIdOverride(ctx.Uint64("start-history-id"))
 		if err != nil {
 			return err
 		}

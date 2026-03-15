@@ -111,12 +111,13 @@ func newOAuthClient(g *Gmail) (*http.Client, error) {
 
 // Gmail represents a Gmail client.
 type Gmail struct {
-	label    string
-	labelId  string
-	cache    gmailCache
-	svc      gmailService
-	dir      maildir.Maildir
-	progress chan<- lib.Progress
+	label                  string
+	labelId                string
+	cache                  gmailCache
+	svc                    gmailService
+	dir                    maildir.Maildir
+	progress               chan<- lib.Progress
+	startHistoryIdOverride uint64
 }
 
 // Creates a new Gmail synchronizer.
@@ -154,6 +155,10 @@ func NewGmail(dir string, label string, serviceAccountJSONFile string, toImperso
 	}
 
 	return &g, nil
+}
+
+func (g *Gmail) SetStartHistoryIdOverride(v uint64) {
+	g.startHistoryIdOverride = v
 }
 
 const (

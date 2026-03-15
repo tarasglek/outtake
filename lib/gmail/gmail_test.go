@@ -61,6 +61,7 @@ type testService struct {
 	Labels           *gmail.ListLabelsResponse
 	LabelsCallCount  int
 	History          map[string]*gmail.ListHistoryResponse
+	HistoryErr       map[string]error
 	Messages         map[string]*gmail.ListMessagesResponse
 	LastHistoryStart uint64
 	HistoryCallCount int
@@ -91,6 +92,9 @@ func (s *testService) GetLabels() (*gmail.ListLabelsResponse, error) {
 func (s *testService) GetHistory(i uint64, label, page string) (*gmail.ListHistoryResponse, error) {
 	s.LastHistoryStart = i
 	s.HistoryCallCount++
+	if err, ok := s.HistoryErr[page]; ok {
+		return nil, err
+	}
 	if m, ok := s.History[page]; ok {
 		return m, nil
 	}
@@ -103,7 +107,6 @@ func (s *testService) GetMessages(q, page string) (*gmail.ListMessagesResponse, 
 	}
 	return nil, errors.New("not found")
 }
-
 
 func getTestClient() (*Gmail, *testService, string) {
 	d, err := ioutil.TempDir("", "")
@@ -119,10 +122,11 @@ func getTestClient() (*Gmail, *testService, string) {
 		panic(err)
 	}
 	s := &testService{
-		Msgs:     make(map[string]string),
-		Metadata: make(map[string]*gmail.Message),
-		Messages: make(map[string]*gmail.ListMessagesResponse),
-		History:  make(map[string]*gmail.ListHistoryResponse),
+		Msgs:       make(map[string]string),
+		Metadata:   make(map[string]*gmail.Message),
+		Messages:   make(map[string]*gmail.ListMessagesResponse),
+		History:    make(map[string]*gmail.ListHistoryResponse),
+		HistoryErr: make(map[string]error),
 	}
 	g := &Gmail{
 		dir:   md,
