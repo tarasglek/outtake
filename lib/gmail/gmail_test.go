@@ -104,6 +104,7 @@ func (s *testService) GetMessages(q, page string) (*gmail.ListMessagesResponse, 
 	return nil, errors.New("not found")
 }
 
+
 func getTestClient() (*Gmail, *testService, string) {
 	d, err := ioutil.TempDir("", "")
 	if err != nil {

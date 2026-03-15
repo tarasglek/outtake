@@ -27,11 +27,17 @@ Use RFC parsing only (no heuristic normalization).
 - If header value is not RFC-parseable, treat as unavailable and continue.
 
 ## Integration points
-After a successful message write/delivery:
+After any successful message write/rewrite operation:
 
 1. compute timestamp using policy above
 2. if available, set file mtime
 3. if unavailable, keep default filesystem mtime
+
+Must be applied consistently to all paths that can rewrite `.mail` files, including:
+
+- initial materialization/write path
+- history add/self-heal write path
+- label-update rewrite path (header rewrite after label delta)
 
 ## Error handling / logging
 mtime logic must never fail the sync operation.

@@ -101,6 +101,10 @@ func (g *Gmail) SyncListedMessagesWithDB(db *sql.DB) error {
 	if workers < 1 {
 		workers = 1
 	}
+	// SQLite can return SQLITE_BUSY under parallel writers in this phase; keep writes reliable.
+	if workers > 1 {
+		workers = 1
+	}
 	wg := sync.WaitGroup{}
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
