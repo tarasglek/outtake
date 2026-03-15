@@ -126,24 +126,25 @@ git commit -m "fix(label-sync): apply history deltas from maildir label state wi
 
 ---
 
-### Task 4: Remove `gmail_message_labels` usage from runtime code
+### Task 4: Remove `gmail_message_labels` usage and deprecated helper codepaths
 
 **Files:**
 - Modify: `lib/gmail/history_sync.go`
 - Modify: `lib/gmail/message_sync.go`
 - Modify: any `labels_sql.go` call sites
 
-**Step 1: Remove writes/reads tied to `gmail_message_labels` for runtime delta logic**
+**Step 1: Remove writes/reads tied to `gmail_message_labels` and delete deprecated helper usage**
 
-- eliminate `getMessageLabels`, `replaceMessageLabels`, `applyLabelDelta` dependencies in history path
-- keep label name mapping table (`gmail_labels`) if still needed for ID->name mapping
+- eliminate `getMessageLabels`, `replaceMessageLabels`, `applyLabelDelta` dependencies from active sync paths
+- remove now-dead helper functions/callers related only to `gmail_message_labels`
+- keep label name mapping table (`gmail_labels`) for ID->name mapping
 
 **Step 2: Ensure no runtime dependency remains**
 
 ```bash
 rg -n "getMessageLabels|replaceMessageLabels|applyLabelDelta|gmail_message_labels" lib/gmail
 ```
-Expected: only legacy helper definitions or migration comments, no active history path usage.
+Expected: no active runtime usage and no deprecated helper definitions left in `lib/gmail` (tests may reference migration checks).
 
 **Step 3: Run full tests**
 
@@ -161,28 +162,27 @@ git commit -m "refactor(label-sync): remove sqlite message-label state from acti
 
 ---
 
-### Task 5: Schema and migration cleanup (safe, non-breaking)
+### Task 5: Schema and migration cleanup (remove deprecated paths)
 
 **Files:**
 - Modify: `lib/gmail/list_pages_schema.go`
 - Create: `docs/label-sync-migration.md`
 
-**Step 1: Mark `gmail_message_labels` deprecated (compat period)**
+**Step 1: Remove `gmail_message_labels` schema creation and deprecated compatibility paths**
 
-Option A (safer): keep table creation but unused.
-Option B (later migration): drop table with explicit migration step.
+- remove table creation from `ensureListPagesSchema`
+- ensure startup/migrations remain safe for existing databases that already contain the table
 
-For this priority fix, choose **Option A** to avoid risky DB migrations now.
+**Step 2: Document migration strategy**
 
-**Step 2: Document cleanup strategy**
-
-Add follow-up note for eventual table removal and one-time maintenance script.
+- add explicit note: existing `gmail_message_labels` tables may remain in-place on old DBs but are unused
+- include optional maintenance SQL for manual table removal (`DROP TABLE gmail_message_labels`) after validation
 
 **Step 3: Commit**
 
 ```bash
 git add lib/gmail/list_pages_schema.go docs/label-sync-migration.md
-git commit -m "docs(schema): deprecate gmail_message_labels for future cleanup"
+git commit -m "docs(schema): remove deprecated gmail_message_labels compatibility path"
 ```
 
 ---
