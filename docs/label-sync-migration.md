@@ -34,6 +34,36 @@ History sync now tracks:
 - `labels_self_healed`: missing file was recovered and label delta applied
 - `labels_apply_failed`: explicit label-delta processing failures
 
+## Debugging notes (future incidents)
+
+Use this quick checklist when labels look stale or wrong locally.
+
+1. **Check history counters in logs**
+   - healthy path should show `labels_applied` increasing
+   - if files are missing, expect `labels_missing_file` and `labels_self_healed` to increase together
+   - repeated growth in `labels_apply_failed` indicates a hard failure path
+
+2. **Inspect one affected message on disk**
+   - locate key: `<gmailMessageId>.mail`
+   - verify `X-Keywords` header contains expected label names (not label IDs)
+
+3. **Confirm label ID -> name mapping health**
+   - run a sync that refreshes labels if unknown IDs appear
+   - unknown labels can temporarily appear as raw IDs until label metadata is refreshed
+
+4. **Self-heal expectations**
+   - when file is missing during history replay, log should include:
+     - `missing local file for label delta ... attempting self-heal`
+   - if self-heal succeeds, message file should be recreated before delta rewrite
+
+5. **Idempotency sanity check**
+   - replaying the same label add/remove event should not duplicate labels
+   - headers should remain normalized/deduplicated/sorted
+
+6. **Legacy table note**
+   - `gmail_message_labels` is not used by runtime sync
+   - do not debug label correctness from that table
+
 ## End-to-end verification checklist
 
 ### Automated regression

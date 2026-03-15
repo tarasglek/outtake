@@ -8,6 +8,19 @@
 
 **Tech Stack:** Go, existing Gmail API sync pipeline, maildir storage, SQLite for cursors/checkpoints.
 
+## Status
+
+✅ Complete (implemented on 2026-03-15)
+
+Completed commits:
+- `ba88083` test(label-sync): add failing tests for maildir-based label state
+- `3d9b343` feat(label-sync): read label state from maildir headers
+- `1515da9` fix(label-sync): apply history deltas from maildir label state with self-heal
+- `9b6eda1` refactor(label-sync): remove sqlite message-label state from active sync path
+- `861c9e0` docs(schema): remove deprecated gmail_message_labels compatibility path
+- `0f32eb4` chore(observability): update history label sync counters for self-heal flow
+- `adfca87` docs(plan): remove deprecated codepath fallback from label sync plan
+
 ---
 
 ### Task 1: Add failing tests that capture current label-sync gaps
