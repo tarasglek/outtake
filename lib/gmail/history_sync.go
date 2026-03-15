@@ -91,6 +91,7 @@ func (g *Gmail) SyncHistoryWithDB(db *sql.DB) error {
 				applied, missingFile, missingState, err := g.applyHistoryLabelDelta(db, l.Message.Id, l.LabelIds, nil, &labelsRefreshedOnMiss, &labelsRefreshMu)
 				if err != nil {
 					labelsFailed++
+					log.Printf("history: label-add apply failed message=%s err=%v", l.Message.Id, err)
 					continue
 				}
 				if applied {
@@ -110,6 +111,7 @@ func (g *Gmail) SyncHistoryWithDB(db *sql.DB) error {
 				applied, missingFile, missingState, err := g.applyHistoryLabelDelta(db, l.Message.Id, nil, l.LabelIds, &labelsRefreshedOnMiss, &labelsRefreshMu)
 				if err != nil {
 					labelsFailed++
+					log.Printf("history: label-remove apply failed message=%s err=%v", l.Message.Id, err)
 					continue
 				}
 				if applied {
@@ -284,36 +286,61 @@ func (g *Gmail) deleteMessageByID(id string) error {
 }
 
 func (g *Gmail) applyHistoryLabelDelta(db *sql.DB, id string, add, remove []string, labelsRefreshedOnMiss *bool, labelsRefreshMu *sync.Mutex) (applied bool, missingFile bool, missingState bool, err error) {
-	labels, err := getMessageLabels(db, id)
-	if err != nil {
-		return false, false, false, err
-	}
-	if len(labels) == 0 {
-		return false, false, true, nil
-	}
-	if err := applyLabelDelta(db, id, add, remove); err != nil {
-		return false, false, false, err
-	}
-	labels, err = getMessageLabels(db, id)
-	if err != nil {
-		return false, false, false, err
-	}
-	mapped, err := g.resolveArchivedLabels(db, labels, labelsRefreshedOnMiss, labelsRefreshMu)
-	if err != nil {
-		return false, false, false, err
-	}
 	k := messageMaildirKey(id)
 	msg, c, err := g.getMaildirMessage(k)
 	if err != nil {
-		return false, true, false, nil
+		missingFile = true
+		didAdd, healErr := g.downloadAndWriteHistoryMessage(db, id, labelsRefreshedOnMiss, labelsRefreshMu)
+		if healErr != nil {
+			return false, true, false, healErr
+		}
+		if !didAdd {
+			return false, true, false, nil
+		}
+		msg, c, err = g.getMaildirMessage(k)
+		if err != nil {
+			return false, true, false, nil
+		}
 	}
 	defer c.Close()
-	msg.Header[labelsHeader] = mapped
+	currentLabels, err := readLabelsFromMaildirMessage(msg)
+	if err != nil {
+		return false, missingFile, false, err
+	}
+	addedLabels, err := g.resolveArchivedLabels(db, add, labelsRefreshedOnMiss, labelsRefreshMu)
+	if err != nil {
+		return false, missingFile, false, err
+	}
+	removedLabels, err := g.resolveArchivedLabels(db, remove, labelsRefreshedOnMiss, labelsRefreshMu)
+	if err != nil {
+		return false, missingFile, false, err
+	}
+
+	nextLabels := applyHeaderLabelDelta(currentLabels, addedLabels, removedLabels)
+	msg.Header[labelsHeader] = nextLabels
 	if err := g.dir.Delete(k); err != nil {
-		return false, false, false, err
+		return false, missingFile, false, err
 	}
 	if _, err := g.dir.DeliverWithKey(msg, k); err != nil {
-		return false, false, false, err
+		return false, missingFile, false, err
 	}
-	return true, false, false, nil
+	return true, missingFile, false, nil
+}
+
+func applyHeaderLabelDelta(current, add, remove []string) []string {
+	next := make(map[string]struct{}, len(current)+len(add))
+	for _, l := range current {
+		next[l] = struct{}{}
+	}
+	for _, l := range add {
+		next[l] = struct{}{}
+	}
+	for _, l := range remove {
+		delete(next, l)
+	}
+	out := make([]string, 0, len(next))
+	for l := range next {
+		out = append(out, l)
+	}
+	return normalizeLabels(out)
 }
