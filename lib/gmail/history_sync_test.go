@@ -75,7 +75,7 @@ func TestSyncHistoryWithDBBootstrapsCursor(t *testing.T) {
 	}
 }
 
-func TestSyncHistoryWithDBAppliesLabelDeltaFromSQLiteState(t *testing.T) {
+func TestHistoryLabelDeltaUsesMaildirStateWithoutSQLiteRows(t *testing.T) {
 	g, svc, dir := getTestClient()
 	db := openTestDB(t, filepath.Join(dir, "history_labels.db"))
 	defer db.Close()
@@ -90,6 +90,9 @@ func TestSyncHistoryWithDBAppliesLabelDeltaFromSQLiteState(t *testing.T) {
 	svc.Msgs["m1"] = raw
 	svc.Metadata["m1"] = &gmailapi.Message{Id: "m1", LabelIds: []string{"Label_1"}}
 	if err := g.SyncListedMessagesWithDB(db); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`DELETE FROM gmail_message_labels WHERE messageId = ?`, "m1"); err != nil {
 		t.Fatal(err)
 	}
 
