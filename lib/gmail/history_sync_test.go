@@ -92,10 +92,6 @@ func TestHistoryLabelDeltaUsesMaildirStateWithoutSQLiteRows(t *testing.T) {
 	if err := g.SyncListedMessagesWithDB(db); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`DELETE FROM gmail_message_labels WHERE messageId = ?`, "m1"); err != nil {
-		t.Fatal(err)
-	}
-
 	if _, err := db.Exec(`INSERT INTO sync_state(key,value,updatedAtMs) VALUES(?,?,1)`, syncStateHistoryCursorCommitted, "100"); err != nil {
 		t.Fatal(err)
 	}

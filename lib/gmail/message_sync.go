@@ -359,9 +359,6 @@ func (g *Gmail) downloadAndWriteListedMessage(db *sql.DB, id string, total, curr
 	if _, err := g.dir.DeliverWithKey(op.Msg, stableKey); err != nil {
 		return false, false, err
 	}
-	if err := replaceMessageLabels(db, id, op.Labels); err != nil {
-		return false, false, err
-	}
 	return true, false, nil
 }
 
