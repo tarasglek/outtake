@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	gmailapi "google.golang.org/api/gmail/v1"
 	_ "modernc.org/sqlite"
@@ -196,5 +197,37 @@ func TestSyncListedMessagesRefreshesLabelsOnUnknown(t *testing.T) {
 	}
 	if name != "CustomLabel" {
 		t.Fatalf("gmail_labels name = %q, expected CustomLabel", name)
+	}
+}
+
+func TestSyncListedMessagesAppliesMtimeFromHeaders(t *testing.T) {
+	g, svc, dir := getTestClient()
+	dbPath := filepath.Join(dir, "m2_mtime.db")
+	db := openTestDB(t, dbPath)
+	seedListRows(t, db, []listedMessage{{MessageID: "m1"}})
+	db.Close()
+
+	headerTS := "Fri, 18 Mar 2022 13:23:33 +0000"
+	raw := base64.URLEncoding.EncodeToString([]byte("From: a@b\nTo: c@d\nSubject: hi\nReceived: from mx by local; " + headerTS + "\n\nbody"))
+	svc.Msgs["m1"] = raw
+	svc.Metadata["m1"] = &gmailapi.Message{Id: "m1", LabelIds: []string{"INBOX"}}
+
+	db2 := openTestDB(t, dbPath)
+	defer db2.Close()
+	if err := g.SyncListedMessagesWithDB(db2); err != nil {
+		t.Fatalf("SyncListedMessagesWithDB() error = %v", err)
+	}
+
+	fn, err := g.dir.GetFile(stableArchiveKey(1, 1, "m1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Stat(fn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, _ := time.Parse(time.RFC1123Z, headerTS)
+	if !fi.ModTime().Equal(want) {
+		t.Fatalf("mtime=%v want=%v", fi.ModTime(), want)
 	}
 }

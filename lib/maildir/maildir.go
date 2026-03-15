@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/mail"
 	"os"
 	"path"
@@ -84,7 +85,12 @@ func (d Maildir) deliverWithKey(m *mail.Message, key Key) (Key, error) {
 	if _, err := io.Copy(f, m.Body); err != nil {
 		return key, err
 	}
-	return key, os.Rename(path.Join(d.dir, tmp, k), path.Join(d.dir, nw, k))
+	targetPath := path.Join(d.dir, nw, k)
+	if err := os.Rename(path.Join(d.dir, tmp, k), targetPath); err != nil {
+		return key, err
+	}
+	applyMtimeFromHeaders(targetPath, m)
+	return key, nil
 }
 
 // GetFile gets the file path for the specified key.
@@ -114,4 +120,42 @@ func (d Maildir) Delete(k Key) error {
 		return err
 	}
 	return os.Remove(f)
+}
+
+func applyMtimeFromHeaders(filePath string, m *mail.Message) {
+	ts, ok := messageTimestampFromHeaders(m.Header)
+	if !ok {
+		log.Printf("mtime: cannot determine from headers file=%s (no parseable Received/Date)", filePath)
+		return
+	}
+	if err := os.Chtimes(filePath, ts, ts); err != nil {
+		log.Printf("mtime: failed to set file=%s err=%v", filePath, err)
+	}
+}
+
+// Received best represents delivery timing into mailbox pipeline.
+// Outbound local copies (commonly SENT/DRAFT) often lack Received.
+// Therefore fallback to Date is required to avoid skipping legitimate messages.
+func messageTimestampFromHeaders(h mail.Header) (time.Time, bool) {
+	for _, received := range h["Received"] {
+		if ts, ok := parseReceivedHeaderTime(received); ok {
+			return ts, true
+		}
+	}
+	if ts, err := mail.ParseDate(h.Get("Date")); err == nil {
+		return ts, true
+	}
+	return time.Time{}, false
+}
+
+func parseReceivedHeaderTime(v string) (time.Time, bool) {
+	idx := strings.LastIndex(v, ";")
+	if idx < 0 {
+		return time.Time{}, false
+	}
+	ts, err := mail.ParseDate(strings.TrimSpace(v[idx+1:]))
+	if err != nil {
+		return time.Time{}, false
+	}
+	return ts, true
 }
